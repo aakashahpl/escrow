@@ -1,0 +1,24 @@
+-- Migration 002: add users and jobs tables
+
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    wallet_address VARCHAR(42) UNIQUE NOT NULL,
+    username VARCHAR(50) UNIQUE,
+    email VARCHAR(255) UNIQUE,
+    role VARCHAR(10) NOT NULL DEFAULT 'BUYER' CHECK (role IN ('BUYER', 'SELLER', 'BOTH')),
+    bio TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE jobs (
+    id SERIAL PRIMARY KEY,
+    posted_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    budget NUMERIC(20, 8) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED')),
+    escrow_id INTEGER REFERENCES escrows(id) ON DELETE SET NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
