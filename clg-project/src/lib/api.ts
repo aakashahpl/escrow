@@ -296,4 +296,48 @@ export const realApi = {
         const proposals = await http<BackendProposal[]>(`/proposals/job/${jobId}`);
         return proposals.length;
     },
+
+    // Escrow details + milestone actions
+    getEscrowDetails: async (escrowId: string | number): Promise<{
+        id: number;
+        contract_address: string;
+        buyer_address: string;
+        seller_address: string;
+        total_amount: string;
+        status: string;
+        milestones: Array<{
+            id: number;
+            milestone_index: number;
+            amount: string;
+            funded: boolean;
+            approved: boolean;
+            released: boolean;
+        }>;
+    }> => {
+        return http(`/escrow/${escrowId}/details`);
+    },
+
+    fundMilestone: async (escrowId: string | number, milestoneIndex: number): Promise<{
+        success: boolean;
+        contractAddress: string;
+        milestoneIndex: number;
+        txHash: string;
+    }> => {
+        return http('/escrow/fund', {
+            method: 'POST',
+            body: JSON.stringify({ escrowId: Number(escrowId), milestoneIndex }),
+        });
+    },
+
+    approveMilestone: async (escrowId: string | number, milestoneIndex: number): Promise<{
+        success: boolean;
+        contractAddress: string;
+        milestoneIndex: number;
+        txHash: string;
+    }> => {
+        return http('/escrow/approve', {
+            method: 'POST',
+            body: JSON.stringify({ escrowId: Number(escrowId), milestoneIndex }),
+        });
+    },
 };

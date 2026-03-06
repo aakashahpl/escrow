@@ -209,11 +209,18 @@ export default function JobProposalsPage({ params }: { params: Promise<{ id: str
                                     </div>
                                 )}
 
-                                {/* Accepted state — show contract info */}
+                                {/* Accepted state — link to escrow management */}
                                 {proposal.status === 'accepted' && (
-                                    <div className="flex items-center gap-2 text-sm text-emerald-700 font-medium">
-                                        <CheckCircle className="w-4 h-4" />
-                                        Accepted — escrow contract deployed
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex items-center gap-2 text-sm text-emerald-700 font-medium">
+                                            <CheckCircle className="w-4 h-4" />
+                                            Accepted — escrow contract deployed
+                                        </div>
+                                        <Link href={`/client/jobs/${jobId}/escrow`}>
+                                            <Button size="sm" variant="outline" className="gap-1.5">
+                                                Manage Contract →
+                                            </Button>
+                                        </Link>
                                     </div>
                                 )}
                             </div>

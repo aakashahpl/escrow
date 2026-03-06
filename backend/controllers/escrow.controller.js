@@ -1,4 +1,5 @@
 import * as escrowService from "../services/escrow.service.js";
+import { getEscrowWithMilestones } from "../repositories/escrow.repository.js";
 
 export const createEscrow = async (req, res, next) => {
   try {
@@ -20,6 +21,16 @@ export const createEscrow = async (req, res, next) => {
   }
 };
 
+export const getEscrowDetails = async (req, res, next) => {
+  try {
+    const escrow = await getEscrowWithMilestones(Number(req.params.id));
+    if (!escrow) return res.status(404).json({ error: "Escrow not found" });
+    return res.json(escrow);
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const fundMilestoneController = async (req, res, next) => {
   try {
     const { escrowId, milestoneIndex } = req.body;
@@ -34,8 +45,6 @@ export const fundMilestoneController = async (req, res, next) => {
     next(err);
   }
 };
-
-
 
 export const approveMilestoneController = async (req, res, next) => {
   try {

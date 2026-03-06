@@ -65,6 +65,23 @@ export const getEscrowById = async (escrowId) => {
   return result.rows[0];
 };
 
+export const getEscrowWithMilestones = async (escrowId) => {
+  const escrowResult = await pool.query(
+    `SELECT * FROM escrows WHERE id = $1`,
+    [escrowId],
+  );
+  const escrow = escrowResult.rows[0];
+  if (!escrow) return null;
+
+  const milestonesResult = await pool.query(
+    `SELECT * FROM milestones
+     WHERE escrow_id = $1
+     ORDER BY milestone_index ASC`,
+    [escrowId],
+  );
+  return { ...escrow, milestones: milestonesResult.rows };
+};
+
 export const getMilestone = async (escrowId, milestoneIndex) => {
   const result = await pool.query(
     `SELECT amount
