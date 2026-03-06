@@ -6,12 +6,13 @@ import { useAuth } from '@/context/AuthContext';
 import { Job } from '@/lib/mockApi';
 import { realApi as api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Plus, Users, Clock, CheckCircle, MoreHorizontal } from 'lucide-react';
+import { Plus, Users, Clock, CheckCircle, FileText } from 'lucide-react';
 import Link from 'next/link';
 
 export default function ClientDashboard() {
     const { user } = useAuth();
     const [jobs, setJobs] = useState<Job[]>([]);
+    const [proposalCounts, setProposalCounts] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -19,6 +20,15 @@ export default function ClientDashboard() {
             if (!user) return;
             const myJobs = await api.getClientJobs(user.id);
             setJobs(myJobs);
+
+            // Fetch proposal counts for all open jobs in parallel
+            const counts = await Promise.all(
+                myJobs.map(async (job) => ({
+                    id: job.id,
+                    count: await api.getProposalCountForJob(job.id),
+                })),
+            );
+            setProposalCounts(Object.fromEntries(counts.map(({ id, count }) => [id, count])));
             setLoading(false);
         };
         fetchData();
@@ -81,36 +91,57 @@ export default function ClientDashboard() {
                     <div className="p-12 text-center text-gray-400">Loading...</div>
                 ) : jobs.length > 0 ? (
                     <div className="divide-y divide-gray-100">
-                        {jobs.map((job) => (
-                            <div key={job.id} className="p-6 hover:bg-gray-50 transition-colors flex items-center justify-between group">
-                                <div>
-                                    <h3 className="font-semibold text-lg text-gray-900 mb-1">
-                                        <Link href={`/jobs/${job.id}`} className="hover:text-emerald-600">
-                                            {job.title}
-                                        </Link>
-                                    </h3>
-                                    <div className="flex items-center gap-4 text-sm text-gray-500">
-                                        <span>Posted {job.postedTimeAgo}</span>
-                                        <span>•</span>
-                                        <span>{job.budgetType} - ${job.budget}</span>
-                                        <span>•</span>
-                                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${job.status === 'open' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+                        {jobs.map((job) => {
+                            const count = proposalCounts[job.id] ?? 0;
+                            return (
+                                <div key={job.id} className="p-6 hover:bg-gray-50 transition-colors flex items-center justify-between group">
+                                    <div>
+                                        <h3 className="font-semibold text-lg text-gray-900 mb-1">
+                                            <Link href={`/jobs/${job.id}`} className="hover:text-emerald-600">
+                                                {job.title}
+                                            </Link>
+                                        </h3>
+                                        <div className="flex items-center gap-4 text-sm text-gray-500">
+                                            <span>Posted {job.postedTimeAgo}</span>
+                                            <span>•</span>
+                                            <span>${job.budget}</span>
+                                            <span>•</span>
+                                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                                job.status === 'open' ? 'bg-green-100 text-green-700'
+                                                : job.status === 'in-progress' ? 'bg-blue-100 text-blue-700'
+                                                : 'bg-gray-100 text-gray-700'
                                             }`}>
-                                            {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
-                                        </span>
+                                                {job.status === 'in-progress' ? 'In Progress' : job.status.charAt(0).toUpperCase() + job.status.slice(1)}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Proposal count + link */}
+                                    <div className="flex items-center gap-3">
+                                        <Link
+                                            href={`/client/jobs/${job.id}/proposals`}
+                                            className="flex flex-col items-center text-right hover:text-emerald-600 transition-colors group/count"
+                                        >
+                                            <div className="flex items-center gap-1.5">
+                                                <FileText className="w-4 h-4 text-gray-400 group-hover/count:text-emerald-500" />
+                                                <span className="text-2xl font-bold text-gray-900">{count}</span>
+                                            </div>
+                                            <span className="text-xs text-gray-400 group-hover/count:text-emerald-600">
+                                                {count === 1 ? 'Proposal' : 'Proposals'}
+                                            </span>
+                                        </Link>
+
+                                        {job.status === 'open' && count > 0 && (
+                                            <Link href={`/client/jobs/${job.id}/proposals`}>
+                                                <Button size="sm" className="text-xs">
+                                                    Review
+                                                </Button>
+                                            </Link>
+                                        )}
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-4">
-                                    <div className="text-right hidden sm:block">
-                                        <div className="text-2xl font-bold text-gray-900">0</div>
-                                        <div className="text-xs text-gray-500">Proposals</div>
-                                    </div>
-                                    <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full">
-                                        <MoreHorizontal className="w-5 h-5" />
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 ) : (
                     <div className="p-12 text-center">
