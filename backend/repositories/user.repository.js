@@ -48,6 +48,18 @@ export const updateUser = async (id, { username, email, role, bio }) => {
   return result.rows[0];
 };
 
+export const updateUserRating = async (id, rating) => {
+  const result = await pool.query(
+    `UPDATE users
+     SET rating = $1,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = $2
+     RETURNING *`,
+    [rating, id],
+  );
+  return result.rows[0];
+};
+
 export const deleteUser = async (id) => {
   await pool.query(`DELETE FROM users WHERE id = $1`, [id]);
 };

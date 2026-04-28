@@ -45,7 +45,11 @@ export const getAllJobs = async ({ status } = {}) => {
 
 export const getJobsByUser = async (userId) => {
   const result = await pool.query(
-    `SELECT * FROM jobs WHERE posted_by = $1 ORDER BY created_at DESC`,
+    `SELECT j.*, u.wallet_address AS poster_wallet, u.username AS poster_username
+     FROM jobs j
+     JOIN users u ON u.id = j.posted_by
+     WHERE j.posted_by = $1
+     ORDER BY j.created_at DESC`,
     [userId],
   );
   return result.rows;

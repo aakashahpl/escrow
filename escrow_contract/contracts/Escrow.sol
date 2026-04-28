@@ -6,6 +6,17 @@ contract Escrow {
     address public buyer;
     address public seller;
 
+    // Dispute state (single active dispute per escrow contract)
+    bool public disputeOpen;
+    uint256 public disputeOpenedAt;
+    uint256 public disputeVoteCount;
+    mapping(address => bool) public disputeVoters;
+
+    event DisputeOpened(address indexed openedBy, uint256 openedAt);
+    event DisputeVoted(address indexed voter, uint256 voteCount);
+    event DisputeResolvedToSeller(uint256 amount);
+    event DisputeRefundedToBuyer(uint256 amount);
+
     struct Milestone {
         uint256 amount;
         bool funded;
@@ -79,6 +90,63 @@ contract Escrow {
     (bool success, ) = payable(seller).call{value: m.amount}("");
     require(success, "Transfer failed");
 }
+
+    function openDispute() external onlySeller {
+        require(!disputeOpen, "Dispute already open");
+
+        bool anyFunded = false;
+        for (uint256 i = 0; i < milestones.length; i++) {
+            if (milestones[i].funded) {
+                anyFunded = true;
+                break;
+            }
+        }
+        require(anyFunded, "No funded milestone");
+
+        disputeOpen = true;
+        disputeOpenedAt = block.timestamp;
+        disputeVoteCount = 0;
+
+        emit DisputeOpened(msg.sender, disputeOpenedAt);
+    }
+
+    function voteDispute() external {
+        require(disputeOpen, "No open dispute");
+        require(msg.sender != buyer && msg.sender != seller, "Buyer/seller cannot vote");
+        require(!disputeVoters[msg.sender], "Already voted");
+
+        disputeVoters[msg.sender] = true;
+        disputeVoteCount += 1;
+
+        emit DisputeVoted(msg.sender, disputeVoteCount);
+
+        if (disputeVoteCount >= 2) {
+            _resolveToSeller();
+        }
+    }
+
+    function refundAfterTimeout() external {
+        require(disputeOpen, "No open dispute");
+        require(block.timestamp >= disputeOpenedAt + 2 days, "Dispute not expired");
+
+        uint256 amount = address(this).balance;
+        disputeOpen = false;
+
+        (bool success, ) = payable(buyer).call{value: amount}("");
+        require(success, "Transfer failed");
+
+        emit DisputeRefundedToBuyer(amount);
+    }
+
+    function _resolveToSeller() internal {
+        uint256 amount = address(this).balance;
+        disputeOpen = false;
+
+        (bool success, ) = payable(seller).call{value: amount}("");
+        require(success, "Transfer failed");
+
+        emit DisputeResolvedToSeller(amount);
+    }
 
     // Helper view off-chain function to check if all milestones are complete
     function isComplete() public view returns (bool) {

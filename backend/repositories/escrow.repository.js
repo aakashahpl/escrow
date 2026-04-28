@@ -65,6 +65,16 @@ export const getEscrowById = async (escrowId) => {
   return result.rows[0];
 };
 
+export const getEscrowPartiesById = async (escrowId) => {
+  const result = await pool.query(
+    `SELECT id, contract_address, buyer_address, seller_address, status
+     FROM escrows
+     WHERE id = $1`,
+    [escrowId],
+  );
+  return result.rows[0];
+};
+
 export const getEscrowWithMilestones = async (escrowId) => {
   const escrowResult = await pool.query(
     `SELECT * FROM escrows WHERE id = $1`,
@@ -80,6 +90,18 @@ export const getEscrowWithMilestones = async (escrowId) => {
     [escrowId],
   );
   return { ...escrow, milestones: milestonesResult.rows };
+};
+
+export const hasAnyFundedMilestone = async (escrowId) => {
+  const result = await pool.query(
+    `SELECT 1
+     FROM milestones
+     WHERE escrow_id = $1
+       AND funded = TRUE
+     LIMIT 1`,
+    [escrowId],
+  );
+  return result.rowCount > 0;
 };
 
 export const getMilestone = async (escrowId, milestoneIndex) => {

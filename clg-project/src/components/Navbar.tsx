@@ -45,6 +45,12 @@ export default function Navbar() {
                             >
                                 Dashboard
                             </Link>
+                            <Link
+                                href="/disputes"
+                                className="hidden md:block text-sm font-medium hover:text-emerald-600"
+                            >
+                                Disputes
+                            </Link>
                             <div className="flex items-center gap-2 pl-4 border-l border-gray-200">
                                 <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-xs font-bold text-emerald-700">
                                     {user.name.charAt(0).toUpperCase()}

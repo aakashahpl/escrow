@@ -4,6 +4,7 @@ import {
   getUserByWallet,
   getAllUsers,
   updateUser,
+  updateUserRating,
   deleteUser,
 } from "../repositories/user.repository.js";
 
@@ -52,6 +53,19 @@ export const editUser = async (id, fields) => {
   if (!user) throw new Error("User not found");
 
   const updated = await updateUser(id, fields);
+  return { success: true, user: updated };
+};
+
+export const setUserRating = async (id, rating) => {
+  const user = await getUserById(id);
+  if (!user) throw new Error("User not found");
+
+  const num = Number(rating);
+  if (!Number.isFinite(num) || num < 0 || num > 5) {
+    throw new Error("rating must be a number between 0 and 5");
+  }
+
+  const updated = await updateUserRating(id, num);
   return { success: true, user: updated };
 };
 

@@ -58,3 +58,13 @@ export const deleteUser = async (req, res, next) => {
     next(err);
   }
 };
+
+export const updateUserRating = async (req, res, next) => {
+  try {
+    const { rating } = req.body;
+    const result = await userService.setUserRating(Number(req.params.id), rating);
+    return res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};

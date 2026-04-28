@@ -5,6 +5,7 @@ import {
   getUserByWallet,
   getAllUsers,
   updateUser,
+  updateUserRating,
   deleteUser,
 } from "../controllers/user.controller.js";
 
@@ -24,6 +25,9 @@ router.get("/:id", getUserById);
 
 // PATCH  /api/users/:id                      — update user profile
 router.patch("/:id", updateUser);
+
+// PATCH  /api/users/:id/rating               — update user's rating (manual/admin)
+router.patch("/:id/rating", updateUserRating);
 
 // DELETE /api/users/:id                      — delete user
 router.delete("/:id", deleteUser);

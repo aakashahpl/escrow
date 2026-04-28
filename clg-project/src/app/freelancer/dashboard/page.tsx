@@ -14,6 +14,7 @@ import Link from 'next/link';
 export default function FreelancerDashboard() {
     const { user } = useAuth();
     const [applications, setApplications] = useState<(Application & { jobTitle: string })[]>([]);
+    const [active, setActive] = useState<(Application & { jobTitle: string })[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -22,10 +23,12 @@ export default function FreelancerDashboard() {
 
             // job_title comes back from the backend JOIN — no extra fetches needed
             const apps = await api.getFreelancerApplications(user.id);
-            setApplications(apps.map(app => ({
+            const mapped = apps.map(app => ({
                 ...app,
                 jobTitle: (app as Application & { jobTitle?: string }).jobTitle ?? 'Unknown Job',
-            })));
+            }));
+            setApplications(mapped);
+            setActive(mapped.filter(a => a.status === 'accepted'));
             setLoading(false);
         };
         fetchData();
@@ -76,7 +79,38 @@ export default function FreelancerDashboard() {
 
             {/* Main Content Area */}
             <div className="flex flex-col lg:flex-row gap-8">
-                <div className="flex-grow">
+                <div className="grow">
+                    <div className="flex items-center justify-between mb-6">
+                        <h2 className="text-xl font-bold text-gray-900">Active Projects</h2>
+                    </div>
+
+                    {loading ? (
+                        <div className="flex justify-center py-6"><Loader2 className="w-8 h-8 animate-spin text-gray-300" /></div>
+                    ) : active.length > 0 ? (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-10">
+                            <div className="divide-y divide-gray-100">
+                                {active.map((app) => (
+                                    <div key={`active-${app.id}`} className="p-6 flex items-center justify-between">
+                                        <div>
+                                            <div className="font-semibold text-gray-900">{app.jobTitle}</div>
+                                            <div className="text-sm text-gray-500">
+                                                Bid: {formatCurrency(app.bidAmount)}
+                                            </div>
+                                        </div>
+                                        <Link href={`/freelancer/jobs/${app.jobId}/escrow`}>
+                                            <Button size="sm">View Escrow</Button>
+                                        </Link>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="bg-white p-8 rounded-2xl border border-dashed border-gray-200 text-center mb-10">
+                            <h3 className="text-lg font-medium text-gray-900 mb-1">No active projects</h3>
+                            <p className="text-gray-500">When a client accepts your proposal, it will show up here.</p>
+                        </div>
+                    )}
+
                     <div className="flex items-center justify-between mb-6">
                         <h2 className="text-xl font-bold text-gray-900">Recent Applications</h2>
                         <Link href="/marketplace" className="text-sm text-emerald-600 font-medium hover:underline">Find more work</Link>
@@ -139,7 +173,7 @@ export default function FreelancerDashboard() {
                 </div>
 
                 {/* Sidebar */}
-                <div className="w-full lg:w-80 flex-shrink-0 space-y-6">
+                <div className="w-full lg:w-80 shrink-0 space-y-6">
                     <div className="bg-emerald-600 rounded-2xl p-6 text-white shadow-lg">
                         <h3 className="font-bold text-lg mb-2">Upgrade to Plus</h3>
                         <p className="text-emerald-100 text-sm mb-4">Get 80 connects per month and see competitor bids.</p>

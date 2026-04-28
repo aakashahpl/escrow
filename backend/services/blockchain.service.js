@@ -52,3 +52,39 @@ export const approveMilestoneTx = async (contractAddress, milestoneIndex) => {
 
   return tx.hash;
 };
+
+export const openDisputeTx = async (contractAddress) => {
+  const escrow = new ethers.Contract(
+    contractAddress,
+    EscrowArtifact.abi,
+    wallet,
+  );
+
+  const tx = await escrow.openDispute();
+  await tx.wait();
+  return tx.hash;
+};
+
+export const voteDisputeTx = async (contractAddress) => {
+  const escrow = new ethers.Contract(
+    contractAddress,
+    EscrowArtifact.abi,
+    wallet,
+  );
+
+  const tx = await escrow.voteDispute();
+  await tx.wait();
+  return tx.hash;
+};
+
+export const refundAfterTimeoutTx = async (contractAddress) => {
+  const escrow = new ethers.Contract(
+    contractAddress,
+    EscrowArtifact.abi,
+    wallet,
+  );
+
+  const tx = await escrow.refundAfterTimeout();
+  await tx.wait();
+  return tx.hash;
+};

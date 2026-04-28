@@ -42,6 +42,7 @@ interface BackendUser {
     email: string | null;
     role: 'BUYER' | 'SELLER' | 'BOTH';
     bio: string | null;
+    rating?: number;
     created_at: string;
     updated_at: string;
 }
@@ -100,6 +101,7 @@ function mapUser(u: BackendUser): User {
         role: u.role === 'SELLER' ? 'freelancer' : 'client',
         avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.wallet_address}`,
         bio: u.bio ?? undefined,
+        rating: typeof u.rating === 'number' ? u.rating : undefined,
     };
 }
 
@@ -338,6 +340,68 @@ export const realApi = {
         return http('/escrow/approve', {
             method: 'POST',
             body: JSON.stringify({ escrowId: Number(escrowId), milestoneIndex }),
+        });
+    },
+
+    // Disputes
+    openDispute: async (
+        escrowId: string | number,
+        requesterWalletAddress: string,
+        txHash?: string,
+    ): Promise<{
+        success: boolean;
+        dispute: unknown;
+        txHash: string | null;
+    }> => {
+        return http('/disputes/open', {
+            method: 'POST',
+            body: JSON.stringify({ escrowId: Number(escrowId), requesterWalletAddress, txHash: txHash ?? null }),
+        });
+    },
+
+    listDisputes: async (requesterWalletAddress: string): Promise<{
+        success: boolean;
+        disputes: Array<{
+            id: number;
+            escrow_id: number;
+            status: string;
+            opened_at: string;
+            resolved_at: string | null;
+            contract_address: string;
+            buyer_address: string;
+            seller_address: string;
+            total_amount: string;
+            vote_count: number;
+        }>;
+    }> => {
+        const params = new URLSearchParams({ requesterWalletAddress });
+        return http(`/disputes?${params.toString()}`);
+    },
+
+    voteDispute: async (
+        disputeId: number,
+        requesterWalletAddress: string,
+        txHash?: string,
+    ): Promise<{
+        success: boolean;
+        votes: number;
+        txHash: string | null;
+        dispute: unknown;
+    }> => {
+        return http(`/disputes/${disputeId}/vote`, {
+            method: 'POST',
+            body: JSON.stringify({ requesterWalletAddress, txHash: txHash ?? null }),
+        });
+    },
+
+    refundDisputeAfterTimeout: async (disputeId: number, txHash?: string): Promise<{
+        success: boolean;
+        txHash: string | null;
+        dispute: unknown;
+    }> => {
+        return http(`/disputes/${disputeId}/refund-timeout`, {
+            method: 'POST',
+            body: JSON.stringify({ txHash: txHash ?? null }),
         });
     },
 };
