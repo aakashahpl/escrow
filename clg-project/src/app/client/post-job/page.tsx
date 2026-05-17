@@ -100,7 +100,7 @@ export default function PostJobPage() {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Budget Amount ($)</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Budget Amount</label>
                             <input
                                 type="number"
                                 name="budget"

@@ -1,287 +1,176 @@
-# Freelance Marketplace — Job & Contract Flow
+# Escrow — Full Stack Setup (Frontend + Backend + Smart Contract)
 
-## Overview
+This repo contains three parts:
 
-This platform connects **buyers** (clients who post jobs) and **sellers** (freelancers who complete work). Payments are secured by a smart contract deployed on the blockchain. The escrow contract holds funds in milestones, releasing each payment only after the buyer approves the completed work.
+- `clg-project/`: Next.js frontend (users connect MetaMask and call the API)
+- `backend/`: Express + Postgres API (deploys/interacts with the escrow contract)
+- `escrow_contract/`: Hardhat project (Solidity escrow contract + artifacts used by backend)
 
----
+## Prerequisites
 
-## Actors
+- Node.js (recommended: Node 18+)
+- npm
+- PostgreSQL (recommended: Postgres 14+)
 
-| Actor | Role |
-|---|---|
-| **Buyer** | Posts jobs, funds milestones, approves completed work |
-| **Seller** | Completes work, receives milestone payments upon approval |
+Optional (for UI wallet flows):
+- MetaMask extension in your browser
 
----
+## Quick start (3 terminals)
 
-## Full Flow
+From the repo root:
 
-### Step 1 — Register Users
+### 1) Smart contract: compile + start local blockchain
 
-Both parties must register before interacting with the platform.
+The backend imports the compiled Hardhat artifact from `escrow_contract/artifacts/...`, so compile once before running the backend.
 
-**Endpoint:** `POST /api/users`
-
-**Request body:**
-```json
-{
-  "walletAddress": "0xABC...123",
-  "username": "alice",
-  "email": "alice@example.com",
-  "role": "BUYER"
-}
+```bash
+cd escrow_contract
+npm install
+npx hardhat compile
+npx hardhat node
 ```
 
-**Role options:** `BUYER` | `SELLER` | `BOTH`
+Keep this terminal running. Hardhat prints **test accounts** and **private keys** — you will use one key as `DEPLOYER_PRIVATE_KEY` for the backend.
 
-Each user is uniquely identified by their **blockchain wallet address**. This wallet is also used to interact with the smart contract on-chain.
+#### (Optional) Use the local chain in MetaMask
 
----
+If you want to use the UI with MetaMask against your local Hardhat node:
 
-### Step 2 — Buyer Posts a Job
+- Add a network in MetaMask:
+  - **Network name**: `Localhost 8545`
+  - **RPC URL**: `http://127.0.0.1:8545`
+  - **Chain ID**: `31337`
+  - **Currency symbol**: `ETH`
+- Import an account using one of the **private keys** printed by `npx hardhat node` (this account will have test ETH on the local chain)
 
-The buyer creates a job listing describing the work they need done. No money moves at this stage — this is just a listing.
+### 2) Backend: set env + migrate DB + start API
 
-**Endpoint:** `POST /api/jobs`
+#### Create Postgres DB
 
-**Request body:**
-```json
-{
-  "postedBy": 1,
-  "title": "Build a DeFi dashboard",
-  "description": "React frontend that shows live token prices and wallet balances.",
-  "budget": "2.5"
-}
+Example using `psql` (adjust names/passwords as you like):
+
+```bash
+# enter psql as postgres (macOS: this may differ depending on your install)
+psql postgres
+
+-- in the psql prompt:
+CREATE DATABASE escrow_app;
+CREATE USER escrow_user WITH PASSWORD 'StrongPassword123!';
+GRANT ALL PRIVILEGES ON DATABASE escrow_app TO escrow_user;
+\q
 ```
 
-**What happens:**
-- A new job record is created with `status = OPEN`
-- `escrow_id` is `NULL` — no contract exists yet
-- The job is visible to all sellers via `GET /api/jobs`
+#### Run migrations
 
----
+From the repo root:
 
-### Step 3 — Buyer & Seller Agree on Terms (Off-Platform)
+```bash
+cd backend
 
-The buyer reviews proposals and selects a seller. They agree off-platform (or via messaging) on:
-
-- Milestones and deliverables
-- Amount per milestone (in ETH)
-
----
-
-### Step 4 — Buyer Deploys the Escrow Contract
-
-Once terms are agreed, the buyer deploys a smart contract that holds the milestone funds. This is a **real on-chain transaction** that costs gas.
-
-**Endpoint:** `POST /api/escrow/create`
-
-**Request body:**
-```json
-{
-  "buyer": "0xBUYER_WALLET",
-  "seller": "0xSELLER_WALLET",
-  "milestones": [
-    { "amount": "1.0" },
-    { "amount": "0.75" },
-    { "amount": "0.75" }
-  ]
-}
+# run migrations in order
+psql "postgresql://escrow_user:StrongPassword123!@localhost:5432/escrow_app" -f migrations/001_init.sql
+psql "postgresql://escrow_user:StrongPassword123!@localhost:5432/escrow_app" -f migrations/002_users_jobs.sql
+psql "postgresql://escrow_user:StrongPassword123!@localhost:5432/escrow_app" -f migrations/003_proposals.sql
+psql "postgresql://escrow_user:StrongPassword123!@localhost:5432/escrow_app" -f migrations/004_disputes_ratings.sql
 ```
 
-**What happens:**
-- A new `Escrow` smart contract is deployed on-chain with the buyer and seller wallet addresses baked in
-- Each milestone amount is recorded in the contract and in the database
-- Returns an `escrowId` and `contractAddress`
+#### Create `backend/.env`
 
-**Response:**
-```json
-{
-  "success": true,
-  "escrowId": 5,
-  "contractAddress": "0xCONTRACT..."
-}
+Create a file `backend/.env`:
+
+```bash
+PORT=3000
+FRONTEND_URL=http://localhost:3001
+
+DATABASE_URL=postgresql://escrow_user:StrongPassword123!@localhost:5432/escrow_app
+
+# Hardhat local node (started in step 1)
+RPC_URL=http://127.0.0.1:8545
+
+# Copy ONE private key from the Hardhat node output (do not include quotes)
+DEPLOYER_PRIVATE_KEY=YOUR_HARDHAT_PRIVATE_KEY
 ```
 
----
+#### Install + run backend
 
-### Step 5 — Link the Escrow to the Job
-
-The buyer ties the deployed contract back to the job listing. This marks the job as hired and in progress.
-
-**Endpoint:** `PATCH /api/jobs/:id/escrow`
-
-**Request body:**
-```json
-{
-  "escrowId": 5
-}
+```bash
+npm install
+npm run dev
 ```
 
-**What happens:**
-- `jobs.escrow_id` is set to the escrow record
-- `jobs.status` changes from `OPEN` → `IN_PROGRESS`
+Backend runs at `http://localhost:3000` and serves routes under `http://localhost:3000/api`.
 
----
+### 3) Frontend: set env + start Next.js
 
-### Step 6 — Buyer Funds a Milestone
+#### Create `clg-project/.env.local`
 
-Before the seller starts work on a milestone, the buyer sends the ETH for that milestone into the contract.
+Create `clg-project/.env.local`:
 
-**Endpoint:** `POST /api/escrow/fund`
-
-**Request body:**
-```json
-{
-  "escrowId": 5,
-  "milestoneIndex": 0
-}
+```bash
+# Backend base URL used by the frontend HTTP client
+NEXT_PUBLIC_API_URL=http://localhost:3000/api
 ```
 
-**What happens:**
-- The buyer's wallet sends ETH to the contract equal to the milestone amount
-- The contract locks the funds
-- `milestones.funded` is set to `TRUE` in the database
+#### Install + run frontend
 
----
-
-### Step 7 — Seller Completes Work
-
-The seller completes the deliverable for the milestone and notifies the buyer (off-platform or via messaging).
-
----
-
-### Step 8 — Buyer Approves the Milestone
-
-After reviewing the work, the buyer approves the milestone. This triggers the contract to release the funds directly to the seller's wallet.
-
-**Endpoint:** `POST /api/escrow/approve`
-
-**Request body:**
-```json
-{
-  "escrowId": 5,
-  "milestoneIndex": 0
-}
+```bash
+cd clg-project
+npm install
+npm run dev -- --port 3001
 ```
 
-**What happens:**
-- The smart contract transfers the milestone ETH to the seller's wallet
-- `milestones.approved` and `milestones.released` are set to `TRUE` in the database
+Open `http://localhost:3001`.
 
----
+## Useful commands
 
-### Step 9 — Repeat for Remaining Milestones
+### Smart contract (Hardhat)
 
-Steps 6–8 repeat for each subsequent milestone until all work is complete.
-
----
-
-### Step 10 — Mark Job as Completed
-
-Once all milestones are approved, the buyer updates the job status.
-
-**Endpoint:** `PATCH /api/jobs/:id`
-
-**Request body:**
-```json
-{
-  "status": "COMPLETED"
-}
+```bash
+cd escrow_contract
+npx hardhat test
 ```
 
----
+### Backend
 
-## Status Reference
-
-### Job Statuses
-
-| Status | Meaning |
-|---|---|
-| `OPEN` | Job posted, no freelancer hired yet |
-| `IN_PROGRESS` | Escrow deployed and linked, work underway |
-| `COMPLETED` | All milestones approved, job finished |
-| `CANCELLED` | Job was cancelled before completion |
-
-### Milestone Statuses (flags)
-
-| Flag | Meaning |
-|---|---|
-| `funded = false` | Buyer has not yet sent ETH for this milestone |
-| `funded = true` | ETH is locked in the contract |
-| `approved = true` | Buyer approved the work |
-| `released = true` | ETH was sent to the seller's wallet |
-
----
-
-## Complete API Reference
-
-### Users
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/users` | Register a new user |
-| `GET` | `/api/users` | List all users |
-| `GET` | `/api/users/:id` | Get user by ID |
-| `GET` | `/api/users/wallet/:walletAddress` | Get user by wallet address |
-| `PATCH` | `/api/users/:id` | Update user profile |
-| `DELETE` | `/api/users/:id` | Delete user |
-
-### Jobs
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/jobs` | Post a new job |
-| `GET` | `/api/jobs` | List all jobs (optional `?status=` filter) |
-| `GET` | `/api/jobs/:id` | Get job by ID |
-| `GET` | `/api/jobs/user/:userId` | Get all jobs posted by a user |
-| `PATCH` | `/api/jobs/:id` | Update job fields or status |
-| `PATCH` | `/api/jobs/:id/escrow` | Attach escrow to job (hire a freelancer) |
-| `DELETE` | `/api/jobs/:id` | Delete job |
-
-### Escrow & Milestones
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/escrow/create` | Deploy a new escrow smart contract |
-| `POST` | `/api/escrow/fund` | Fund a milestone (buyer sends ETH to contract) |
-| `POST` | `/api/escrow/approve` | Approve milestone and release ETH to seller |
-
----
-
-## Visual Flow
-
+```bash
+cd backend
+npm run dev
 ```
-Buyer registers          Seller registers
-      │                        │
-      └──────────┬─────────────┘
-                 │
-          Buyer posts job
-          [status: OPEN]
-                 │
-         Seller is selected
-        (off-platform agreement)
-                 │
-      Buyer deploys escrow contract
-      POST /api/escrow/create
-                 │
-      Buyer links escrow to job
-      PATCH /api/jobs/:id/escrow
-      [status: IN_PROGRESS]
-                 │
-        ┌────────▼────────┐
-        │   Milestone N   │  ← repeats for each milestone
-        │                 │
-        │  Buyer funds    │  POST /api/escrow/fund
-        │  Seller works   │
-        │  Buyer approves │  POST /api/escrow/approve
-        │  ETH released   │
-        └────────┬────────┘
-                 │
-        All milestones done
-                 │
-        Buyer marks complete
-        PATCH /api/jobs/:id
-        [status: COMPLETED]
+
+### Frontend
+
+```bash
+cd clg-project
+npm run dev -- --port 3001
 ```
+
+## Troubleshooting
+
+### Backend fails with “Cannot find …/escrow_contract/artifacts/…/Escrow.json”
+
+You need to compile the contract once:
+
+```bash
+cd escrow_contract
+npx hardhat compile
+```
+
+### Frontend calls the wrong API URL
+
+Ensure `clg-project/.env.local` has:
+
+```bash
+NEXT_PUBLIC_API_URL=http://localhost:3000/api
+```
+
+Then restart the frontend dev server.
+
+### CORS error in browser
+
+Make sure `backend/.env` has:
+
+```bash
+FRONTEND_URL=http://localhost:3001
+```
+
+and restart the backend.
